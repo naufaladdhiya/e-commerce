@@ -34,10 +34,10 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
   Route::get('/checkout', CheckoutPage::class);
   Route::get('/my-orders', MyOrdersPage::class);
-  Route::get('/my-orders/{orders}', MyOrderDetailPage::class);
+  Route::get('/my-orders/{orders}', MyOrderDetailPage::class)->name('my-orders.show');
 
-  Route::get('/success', SuccessPage::class);
-  Route::get('/cancel', CancelPage::class);
+  Route::get('/success', SuccessPage::class)->name('success');
+  Route::get('/cancel', CancelPage::class)->name('cancel');
 
   Route::get('/logout', function () {
     auth()->logout();
