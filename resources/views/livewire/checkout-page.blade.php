@@ -254,8 +254,7 @@
                 alert('Please select a payment method.');
                 return;
             }
-
-
+            
             snap.pay('{{ $snapToken }}', {
                 onSuccess: function(result) {
                     console.log('Payment successful:', result);
