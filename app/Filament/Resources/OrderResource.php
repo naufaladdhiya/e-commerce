@@ -55,7 +55,6 @@ class OrderResource extends Resource
                             ->options([
                                 'credit_card' => 'Credit Card',
                                 'cod' => 'Cash on Delivery',
-                                'stripe' => 'Stripe',
                             ])
                             ->required(),
 
@@ -118,8 +117,8 @@ class OrderResource extends Resource
                     ])->columns(2),
 
                     Section::make('Order Items')->schema([
-                        Repeater::make('items')
-                            ->relationship('orderItems')
+                        Repeater::make('orderItems')
+                            ->relationship()
                             ->schema([
 
                                 Select::make('product_id')
@@ -152,23 +151,24 @@ class OrderResource extends Resource
 
                                 TextInput::make('total_amounth')
                                     ->numeric()
+                                    ->disabled()
                                     ->dehydrated()
                                     ->columnSpan(3)
                                     ->required(),
                             ])->columns(12),
 
                         Placeholder::make('grand_total_placeholder')
-                            ->label('Total')
+                            ->label('Grand Total')
                             ->columnSpanFull()
                             ->content(function (Get $get, Set $set) {
                                 $total = 0;
 
-                                if (!$repeaters = $get('items')) {
+                                if (!$repeaters = $get('ordersItems')) {
                                     return $total;
                                 }
 
                                 foreach ($repeaters as $key => $repeater) {
-                                    $total += $get("items.{$key}.total_amounth");
+                                    $total += $get("ordersItems.{$key}.total_amounth");
                                 }
                                 $set('grand_total', $total);
                                 return Number::currency($total, 'IDR');
@@ -242,7 +242,7 @@ class OrderResource extends Resource
                         ->icon('heroicon-o-shopping-bag')
                         ->requiresConfirmation()
                         ->action(function (Order $record) {
-                            if ($record && $record->payment_method == 'invoice' && $record->status == 'new') {
+                            if ($record && ($record->payment_method == 'invoice' || $record->payment_method == 'cod') && $record->status == 'new') {
                                 Config::$serverKey = config('services.midtrans.server_key');
                                 Config::$isProduction = config('services.midtrans.is_production');
                                 Config::$isSanitized = true;
@@ -252,7 +252,10 @@ class OrderResource extends Resource
                                     $checkStatus = Transaction::status($record->id);
 
                                     if ($checkStatus->transaction_status == 'settlement') {
-                                        $record->update(['status' => 'processing']);
+                                        $record->update([
+                                            'status' => 'processing',
+                                            'payment_status' => 'paid'
+                                        ]);
                                         Notification::make()
                                             ->title('Payment Updated')
                                             ->body('Payment updated successfully.')
@@ -280,6 +283,38 @@ class OrderResource extends Resource
                                             ->danger()
                                             ->send();
                                     }
+                                }
+                            } else {
+                                Notification::make()
+                                    ->title('Invalid Data')
+                                    ->body('Invalid payment method or record.')
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('Update Payment cod')
+                        ->icon('heroicon-o-shopping-bag')
+                        ->requiresConfirmation()
+                        ->action(function (Order $record) {
+                            if ($record && $record->payment_method == 'cod' && $record->status == 'new') {
+                                try {
+                                    // Update the record directly since it's COD
+                                    $record->update([
+                                        'status' => 'delivered',
+                                        'payment_status' => 'paid'
+                                    ]);
+                                    Notification::make()
+                                        ->title('Payment Updated')
+                                        ->body('Payment updated successfully.')
+                                        ->success()
+                                        ->send();
+                                } catch (\Exception $e) {
+                                    Notification::make()
+                                        ->title('Update Failed')
+                                        ->body('An error occurred: ' . $e->getMessage())
+                                        ->danger()
+                                        ->send();
                                 }
                             } else {
                                 Notification::make()

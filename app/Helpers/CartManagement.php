@@ -24,6 +24,7 @@ class CartManagement
     if ($existing_item !== null) {
       $cart_items[$existing_item]['quantity']++;
       $cart_items[$existing_item]['total_amounth'] = $cart_items[$existing_item]['quantity'] * $cart_items[$existing_item]['unit_amount'];
+      $cart_items[$existing_item]['unit_amount'];
     } else {
       $product = Product::where('id', $product_id)->first(['id', 'name', 'price', 'images']);
       if ($product) {
