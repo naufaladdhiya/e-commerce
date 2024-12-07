@@ -1,9 +1,9 @@
 <x-mail::message>
     # Order Placed Successfully!
 
-    Thank you for your order. Your order number is: {{ $order->id }}.
+    Thank you for your order. We have received your order and will process it shortly.
 
-    <x-mail::button :url="''">
+    <x-mail::button :url="$url">
         Button Text
     </x-mail::button>
 

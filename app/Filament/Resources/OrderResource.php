@@ -3,12 +3,9 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderResource\Pages;
-use App\Filament\Resources\OrderResource\RelationManagers;
 use App\Filament\Resources\OrderResource\RelationManagers\AddressRelationManager;
 use App\Models\Order;
 use App\Models\Product;
-use Faker\Provider\ar_EG\Text;
-use Filament\Forms;
 use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -21,14 +18,16 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Number;
+use Midtrans\Config;
+use Midtrans\Transaction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
 
 class OrderResource extends Resource
 {
@@ -56,7 +55,6 @@ class OrderResource extends Resource
                             ->options([
                                 'credit_card' => 'Credit Card',
                                 'cod' => 'Cash on Delivery',
-                                'stripe' => 'Stripe',
                             ])
                             ->required(),
 
@@ -115,12 +113,12 @@ class OrderResource extends Resource
                             ->required(),
 
                         Textarea::make('notes')
-                            ->columnSpanFull()
+                            ->columnSpanFull(),
                     ])->columns(2),
 
                     Section::make('Order Items')->schema([
-                        Repeater::make('items')
-                            ->relationship('orderItems')
+                        Repeater::make('orderItems')
+                            ->relationship()
                             ->schema([
 
                                 Select::make('product_id')
@@ -131,8 +129,8 @@ class OrderResource extends Resource
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->columnSpan(4)
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($state, Set $set) => $set('unit_amount', Product::find($state)?->price ?? 0))
-                                    ->afterStateUpdated(fn ($state, Set $set) => $set('total_amounth', Product::find($state)?->price ?? 0))
+                                    ->afterStateUpdated(fn($state, Set $set) => $set('unit_amount', Product::find($state)?->price ?? 0))
+                                    ->afterStateUpdated(fn($state, Set $set) => $set('total_amounth', Product::find($state)?->price ?? 0))
                                     ->required(),
 
                                 TextInput::make('quantity')
@@ -141,7 +139,7 @@ class OrderResource extends Resource
                                     ->minValue(1)
                                     ->columnSpan(2)
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($state, Set $set, Get $get) => $set('total_amounth', $state * $get('unit_amount')))
+                                    ->afterStateUpdated(fn($state, Set $set, Get $get) => $set('total_amounth', $state * $get('unit_amount')))
                                     ->required(),
 
                                 TextInput::make('unit_amount')
@@ -153,23 +151,24 @@ class OrderResource extends Resource
 
                                 TextInput::make('total_amounth')
                                     ->numeric()
+                                    ->disabled()
                                     ->dehydrated()
                                     ->columnSpan(3)
                                     ->required(),
                             ])->columns(12),
 
                         Placeholder::make('grand_total_placeholder')
-                            ->label('Total')
+                            ->label('Grand Total')
                             ->columnSpanFull()
                             ->content(function (Get $get, Set $set) {
                                 $total = 0;
 
-                                if (!$repeaters = $get('items')) {
+                                if (!$repeaters = $get('ordersItems')) {
                                     return $total;
                                 }
 
                                 foreach ($repeaters as $key => $repeater) {
-                                    $total += $get("items.{$key}.total_amounth");
+                                    $total += $get("ordersItems.{$key}.total_amounth");
                                 }
                                 $set('grand_total', $total);
                                 return Number::currency($total, 'IDR');
@@ -178,8 +177,8 @@ class OrderResource extends Resource
                         Hidden::make('grand_total')
                             ->default(0)
                             ->required(),
-                    ])
-                ])->columnSpanFull()
+                    ]),
+                ])->columnSpanFull(),
             ]);
     }
 
@@ -239,14 +238,101 @@ class OrderResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('Update Payment Invoice')
+                        ->icon('heroicon-o-shopping-bag')
+                        ->requiresConfirmation()
+                        ->action(function (Order $record) {
+                            if ($record && ($record->payment_method == 'invoice' || $record->payment_method == 'cod') && $record->status == 'new') {
+                                Config::$serverKey = config('services.midtrans.server_key');
+                                Config::$isProduction = config('services.midtrans.is_production');
+                                Config::$isSanitized = true;
+                                Config::$is3ds = true;
+
+                                try {
+                                    $checkStatus = Transaction::status($record->id);
+
+                                    if ($checkStatus->transaction_status == 'settlement') {
+                                        $record->update([
+                                            'status' => 'processing',
+                                            'payment_status' => 'paid'
+                                        ]);
+                                        Notification::make()
+                                            ->title('Payment Updated')
+                                            ->body('Payment updated successfully.')
+                                            ->success()
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->title('Update Failed')
+                                            ->body('Payment status not settled. Unable to update.')
+                                            ->danger()
+                                            ->send();
+                                    }
+                                } catch (\Exception $e) {
+                                    $errorMessage = json_decode($e->getMessage(), true);
+                                    if (isset($errorMessage['status_code']) && $errorMessage['status_code'] == '404') {
+                                        Notification::make()
+                                            ->title('Transaction Not Found')
+                                            ->body("Transaction doesn't exist.")
+                                            ->danger()
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->title('Transaction Not Found')
+                                            ->body("Transaction doesn't exist.")
+                                            ->danger()
+                                            ->send();
+                                    }
+                                }
+                            } else {
+                                Notification::make()
+                                    ->title('Invalid Data')
+                                    ->body('Invalid payment method or record.')
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Tables\Actions\Action::make('Update Payment cod')
+                        ->icon('heroicon-o-shopping-bag')
+                        ->requiresConfirmation()
+                        ->action(function (Order $record) {
+                            if ($record && $record->payment_method == 'cod' && $record->status == 'new') {
+                                try {
+                                    // Update the record directly since it's COD
+                                    $record->update([
+                                        'status' => 'delivered',
+                                        'payment_status' => 'paid'
+                                    ]);
+                                    Notification::make()
+                                        ->title('Payment Updated')
+                                        ->body('Payment updated successfully.')
+                                        ->success()
+                                        ->send();
+                                } catch (\Exception $e) {
+                                    Notification::make()
+                                        ->title('Update Failed')
+                                        ->body('An error occurred: ' . $e->getMessage())
+                                        ->danger()
+                                        ->send();
+                                }
+                            } else {
+                                Notification::make()
+                                    ->title('Invalid Data')
+                                    ->body('Invalid payment method or record.')
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
-                ])
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    ExportBulkAction::make(),
                 ]),
             ]);
     }
@@ -263,7 +349,7 @@ class OrderResource extends Resource
         return static::getModel()::count();
     }
 
-    public static function getNavigationBadgeColor(): string|array|null
+    public static function getNavigationBadgeColor(): string | array | null
     {
         return static::getModel()::count() > 10 ? 'success' : 'danger';
     }

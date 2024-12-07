@@ -208,7 +208,8 @@
                 </div>
                 <button type="submit"
                     class="bg-green-500 mt-4 w-full p-3 rounded-lg text-lg text-white hover:bg-green-600">
-                    Place Order
+                    <span wire:loading.remove>Place Order</span>
+                    <span wire:loading>Processing...</span>
                 </button>
                 <div class="bg-white mt-4 rounded-xl shadow p-4 sm:p-7 dark:bg-slate-900">
                     <div class="text-xl font-bold underline text-gray-700 dark:text-white mb-2">
@@ -238,10 +239,34 @@
                                 </div>
                             </li>
                         @endforeach
-
                     </ul>
                 </div>
             </div>
         </div>
     </form>
 </div>
+
+@if ($snapToken)
+    <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ config('midtrans.client_key') }}">
+    </script>
+    <script type="text/javascript">
+        document.getElementById('pay-button').onclick = function() {
+            if (!document.querySelector('input[name="payment_method"]:checked')) {
+                alert('Please select a payment method.');
+                return;
+            }
+
+            snap.pay('{{ $snapToken }}', {
+                onSuccess: function(result) {
+                    console.log('Payment successful:', result);
+                },
+                onPending: function(result) {
+                    console.log('Payment pending:', result);
+                },
+                onError: function(result) {
+                    console.error('Payment error:', result);
+                }
+            });
+        };
+    </script>
+@endif

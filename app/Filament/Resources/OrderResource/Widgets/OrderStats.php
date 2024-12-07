@@ -6,6 +6,7 @@ use App\Models\Order;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Number;
+use NumberFormatter;
 
 class OrderStats extends BaseWidget
 {
@@ -15,8 +16,12 @@ class OrderStats extends BaseWidget
             Stat::make('New Orders', Order::query()->where('status', 'new')->count()),
             Stat::make('Processing Orders', Order::query()->where('status', 'processing')->count()),
             Stat::make('Completed Orders', Order::query()->where('status', 'shipped')->count()),
-            Stat::make('Average Price', Number::currency(Order::query()->average('grand_total'))),
+            Stat::make('Average Price', function () {
+                $average = Order::query()->average('grand_total');
 
+                $formatter = new NumberFormatter('id_ID', NumberFormatter::CURRENCY);
+                return $formatter->formatCurrency($average, 'IDR');
+            }),
         ];
     }
 }

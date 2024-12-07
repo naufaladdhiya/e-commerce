@@ -8,8 +8,9 @@
                     <h1
                         class="block text-3xl font-bold text-gray-800 sm:text-4xl lg:text-6xl lg:leading-tight dark:text-white">
                         Start your Shop with <span class="text-blue-600">ViestaShop</span></h1>
-                    <p class="mt-3 text-lg text-gray-800 dark:text-gray-400">Purchase wide varities of electronics
-                        products like Smartphones, Laptops, Smartwatches, Television and many more.</p>
+                    <p class="mt-3 text-lg text-gray-800 dark:text-gray-400">
+                        Buy various kinds of art items
+                        products such as barongan, masks, traditional clothes and many more.</p>
 
                     <!-- Buttons -->
                     <div class="mt-7 grid gap-3 w-full sm:inline-flex">
@@ -198,7 +199,7 @@
     </div>
 
     {{-- Brand Section --}}
-    <section class="py-20">
+    {{-- <section class="py-20">
         <div class="max-w-xl mx-auto">
             <div class="text-center ">
                 <div class="relative flex flex-col items-center">
@@ -274,7 +275,7 @@
 
             </div>
         </div>
-    </section>
+    </section> --}}
 
     {{-- Categories Section --}}
     <div class="bg-orange-200 py-20">

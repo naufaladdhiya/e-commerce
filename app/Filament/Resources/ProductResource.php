@@ -2,29 +2,25 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ProductResource\Pages;
-use App\Filament\Resources\ProductResource\RelationManagers;
-use App\Models\Product;
-use Filament\Forms;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Group;
-use Filament\Forms\Components\MarkdownEditor;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Form;
-use Filament\Forms\Set;
-use Filament\Resources\Resource;
 use Filament\Tables;
+use App\Models\Product;
+use Filament\Forms\Set;
+use Filament\Forms\Form;
+use Filament\Tables\Table;
+use Illuminate\Support\Str;
+use Filament\Resources\Resource;
+use Filament\Forms\Components\Group;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Section;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\FileUpload;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Str;
-
+use Filament\Forms\Components\MarkdownEditor;
+use App\Filament\Resources\ProductResource\Pages;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
 
 class ProductResource extends Resource
 {
@@ -64,7 +60,7 @@ class ProductResource extends Resource
                             ->required()
                             ->placeholder('Product Description')
                             ->columnSpanFull()
-                            ->fileAttachmentsDirectory('products')
+                            ->fileAttachmentsDirectory('products'),
                     ])->columns(2),
 
                     Section::make('Images')->schema([
@@ -74,7 +70,7 @@ class ProductResource extends Resource
                             ->maxFiles(5)
                             ->reorderable()
                             ->required(),
-                    ])
+                    ]),
                 ])->columnSpan(2),
 
                 Group::make()->schema([
@@ -82,7 +78,7 @@ class ProductResource extends Resource
                         TextInput::make('price')
                             ->numeric()
                             ->required()
-                            ->prefix('Rp')
+                            ->prefix('Rp'),
                     ]),
 
                     Section::make('Associations')->schema([
@@ -113,9 +109,9 @@ class ProductResource extends Resource
 
                         Toggle::make('on_sale')
                             ->required(),
-                    ])
+                    ]),
 
-                ])->columnSpan(1)
+                ])->columnSpan(1),
 
             ])->columns(3);
     }
@@ -171,11 +167,12 @@ class ProductResource extends Resource
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
-                ])
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    ExportBulkAction::make(),
                 ]),
             ]);
     }
