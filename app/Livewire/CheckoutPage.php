@@ -6,11 +6,13 @@ use App\Helpers\CartManagement;
 use App\Mail\OrderPlaced;
 use App\Models\Address;
 use App\Models\Order;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 use Midtrans\Config;
 use Midtrans\Snap;
-use Midtrans\Notification;
+
 
 
 class CheckoutPage extends Component
@@ -120,54 +122,23 @@ class CheckoutPage extends Component
         }
     }
 
+    // public function callback(Request $request)
+    // {
+    //     Log::info('Midtrans Callback: ', $request->all());
+    //     Config::$serverKey = config('services.midtrans.server_key');
+    //     Config::$isProduction = config('services.midtrans.is_production');
+    //     Config::$isSanitized = true;
+    //     Config::$is3ds = true;
 
-
-    public function handleMidtransNotification()
-    {
-        $notification = new Notification();
-
-        $orderId = $notification->order_id;
-        $transactionStatus = $notification->transaction_status;
-        $paymentType = $notification->payment_type;
-        $fraudStatus = $notification->fraud_status;
-
-        $order = Order::find($orderId);
-
-        if (!$order) {
-            return response()->json(['message' => 'Order not found'], 404);
-        }
-
-        // Update the order status based on Midtrans transaction status
-        if ($transactionStatus == 'capture') {
-            if ($paymentType == 'invoice') {
-                if ($fraudStatus == 'challenge') {
-                    // The transaction is challenged by Midtrans FDS (Fraud Detection System)
-                    $order->payment_status = 'challenge';
-                } else {
-                    // Successful payment
-                    $order->payment_status = 'paid';
-                }
-            }
-        } elseif ($transactionStatus == 'settlement') {
-            // Settlement means the payment has been successfully completed
-            $order->payment_status = 'paid';
-        } elseif ($transactionStatus == 'pending') {
-            // The payment is still pending
-            $order->payment_status = 'pending';
-        } elseif ($transactionStatus == 'deny' || $transactionStatus == 'expire' || $transactionStatus == 'cancel') {
-            // Payment failed, expired, or was canceled
-            $order->payment_status = 'failed';
-        }
-
-        if ($transactionStatus == 'settlement' || $transactionStatus == 'capture') {
-            return redirect()->route('success');
-        }
-
-        // Save the updated order
-        $order->save();
-
-        return response()->json(['message' => 'Payment status updated successfully']);
-    }
+    //     $hashed = hash('sha512', $request->order_id . $request->status_code . $request->gross_amount . config('services.midtrans.server_key'));
+    //     if ($hashed === $request->signature_key) {
+    //         if ($request->transaction_status === 'settlement') {
+    //             $order = Order::find($request->order_id);
+    //             $order->update(['payment_status' => 'paid']);
+    //             $order->save();
+    //         }
+    //     }
+    // }
 
     public function render()
     {

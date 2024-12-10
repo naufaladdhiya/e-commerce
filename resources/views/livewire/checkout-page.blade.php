@@ -3,6 +3,7 @@
         Checkout
     </h1>
     <form wire:submit.prevent="placeOrder">
+        @csrf
         <div class="grid grid-cols-12 gap-4">
             <div class="md:col-span-12 lg:col-span-8 col-span-12">
                 <!-- Card -->

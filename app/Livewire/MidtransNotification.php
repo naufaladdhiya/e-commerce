@@ -2,33 +2,31 @@
 
 namespace App\Livewire;
 
+use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\Request;
-use Livewire\Component;
+use Illuminate\Support\Facades\Log;
+use Midtrans\Config;
 
-class MidtransNotification extends Component
+class MidtransNotification extends Controller
 {
     public $statusMessage;
 
-    public function handleNotification(Request $request)
+    public function callback(Request $request)
     {
-        $order_id = $request->order_id;
-        $transaction_status = $request->transaction_status;
+        Log::info('Midtrans Callback: ', $request->all());
+        Config::$serverKey = config('services.midtrans.server_key');
+        Config::$isProduction = config('services.midtrans.is_production');
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
 
-        $order = Order::find($order_id);
-
-        if ($order) {
-            if ($transaction_status === 'settlement' || $transaction_status === 'capture') {
-                $order->payment_status = 'paid';
-                $order->status = 'delivered';
+        $hashed = hash('sha512', $request->order_id . $request->status_code . $request->gross_amount . config('services.midtrans.server_key'));
+        if ($hashed === $request->signature_key) {
+            if ($request->transaction_status === 'settlement') {
+                $order = Order::find($request->order_id);
+                $order->update(['payment_status' => 'paid']);
                 $order->save();
-
-                $this->statusMessage = 'Payment Success';
-            } else {
-                $this->statusMessage = 'Payment Failed';
             }
-        } else {
-            $this->statusMessage = 'Order not found';
         }
 
         return view('livewire.midtrans-notification', ['statusMessage' => $this->statusMessage]);
